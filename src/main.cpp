@@ -1,6 +1,6 @@
 #include <Arduino.h>
 #include <Wire.h>
-#include <servo-wrapper.hpp>
+#include <servo-wrapper>
 #include <math.h>
 
 #define frontLeftMotorPin 5
@@ -78,7 +78,7 @@ DriveValues driveTank(float go, float steer) {
 }
 
 void setup() {
-  Serial.begin(9600);
+  Serial.(9600);
   pinMode(rightStickHorizontalPin, INPUT);
   pinMode(rightStickVerticalPin, INPUT);
   pinMode(intakePin, INPUT);
@@ -94,6 +94,7 @@ void setup() {
   #else
     leftMotor.begin();
     rightMotor.begin();
+  #endif
 }
 
 void loop() {
@@ -137,7 +138,6 @@ void loop() {
     
     // Debugging assistance
     Serial.println(
-      #if FOUR_MOTORS
         String("RH:") + channels.rightStickHorizontal.value
             + ", RV:" + channels.rightStickVertical.value
             + ", LH:" + channels.leftStickHorizontal.value

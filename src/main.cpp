@@ -18,10 +18,17 @@
 #define CHANNEL_DEADZONE 50
 #define CHANNEL_DEADZONE_CENTER 1500
 
-ServoWrapper frontLeft(frontLeftMotorPin);
-ServoWrapper frontRight(frontRightMotorPin);
-ServoWrapper backLeft(backLeftMotorPin);
-ServoWrapper backRight(backRightMotorPin);
+#define FOUR_MOTORS true
+
+#if FOUR_MOTORS
+  ServoWrapper frontLeft(frontLeftMotorPin);
+  ServoWrapper frontRight(frontRightMotorPin);
+  ServoWrapper backLeft(backLeftMotorPin);
+  ServoWrapper backRight(backRightMotorPin);
+#else
+  ServoWrapper leftMotor(frontLeftMotorPin);
+  ServoWrapper rightMotor(frontRightMotorPin);
+#endif
 
 struct DriveValues { float left, right; };
 
@@ -52,7 +59,6 @@ void updateChannel(volatile channelInfo& channel){
       channel.wasOn = false;
       long delta = now - channel.lastHighTime;
       if(delta < NOISE_THRESHOLD) return;
-      if()
       if(abs(delta - CHANNEL_DEADZONE_CENTER) <= CHANNEL_DEADZONE) delta = 1500;
       channel.value = (float)(delta - 1500) / 500.0f;
     }
@@ -79,18 +85,28 @@ void setup() {
   attachInterrupt(digitalPinToInterrupt(rightStickHorizontalPin), []{updateChannel(channels.rightStickHorizontal); }, CHANGE);
   attachInterrupt(digitalPinToInterrupt(rightStickVerticalPin), []{updateChannel(channels.rightStickVertical); }, CHANGE);
   attachInterrupt(digitalPinToInterrupt(intakePin), []{updateChannel(channels.intake); }, CHANGE);
-  frontLeft.begin();
-  frontRight.begin();
-  backLeft.begin();
-  backRight.begin();
+
+  #if FOUR_MOTORS
+    frontLeft.begin();
+    frontRight.begin();
+    backLeft.begin();
+    backRight.begin();
+  #else
+    leftMotor.begin();
+    rightMotor.begin();
 }
 
 void loop() {
     if (channels.switchA.value > 0.5f) {
+      #if FOUR_MOTORS
         frontLeft.drive(0.0f);
         frontRight.drive(0.0f);
         backLeft.drive(0.0f);
         backRight.drive(0.0f);
+      #else 
+        rightMotor.drive(0.0f);
+        leftMotor.drive(0.0f);
+      #endif
         delay(2500);
         return;
     }
@@ -102,23 +118,30 @@ void loop() {
     
     // Move motors
     DriveValues driveValues = driveTank(stick.x, stick.y)
+
+    #if FOUR_MOTORS
+      frontLeft.drive(driveValues.left);
+      backLeft.drive(driveValues.left);
+      frontRight.drive(driveValues.right);
+      backRight.drive(driveValues.right);
+    #else
+      leftMotor.drive(driveValues.left);
+      rightMotor.drive(driveValues.right);
+    #endif
     // float v = channels.rightStickVertical.value;
     // frontLeft.drive(v);
     // frontRight.drive(v);
     // backLeft.drive(v);
     // backRight.drive(v);
-    
     // Fans
-    digitalWrite(fanPin, channels.switchD.value > 0.5f ? HIGH : LOW);
     
     // Debugging assistance
     Serial.println(
+      #if FOUR_MOTORS
         String("RH:") + channels.rightStickHorizontal.value
             + ", RV:" + channels.rightStickVertical.value
             + ", LH:" + channels.leftStickHorizontal.value
             + ", LV:" + channels.leftStickVertical.value
-            + ", SA:" + channels.switchA.value
-            + ", SD:" + channels.switchD.value
     );
 }
 

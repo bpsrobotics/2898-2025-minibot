@@ -1,3 +1,4 @@
+#pragma once
 #include <Servo.h>
 
 class ServoWrapper {
@@ -11,15 +12,15 @@ class ServoWrapper {
         }
 
         void drive(float value) {
-            if(value > 1.0) value = 1.0;
-            if(value < -1.0) value = -1.0;
-            servo->writeMicroSeconds(1500 + 500 * value * multiplier);
+            if(value > 1.0f) value = 1.0f;
+            if(value < -1.0f) value = -1.0f;
+            servo->writeMicroseconds(1500 + (int)(500 * value * multiplier));
             lastValue = value;
         }
 
-        private:
-            Servo* servo;
-            float lastValue, multiplier;
-            int pin;
-
-}
+    private:
+        Servo* servo;
+        float lastValue;
+        float multiplier;
+        int pin;
+};

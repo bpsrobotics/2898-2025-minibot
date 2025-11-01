@@ -5,7 +5,7 @@
 
 #define frontLeftMotorPin 5
 #define backLeftMotorPin 6
-#define backRightMotorPin 9
+#define backRightMotorPin 5
 #define frontRightMotorPin 10
 
 

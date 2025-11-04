@@ -4,19 +4,19 @@
 #include "servo-wrapper.h"
 
 #define frontLeftMotorPin 5
-#define backLeftMotorPin 6
-#define backRightMotorPin 5
-#define frontRightMotorPin 10
+#define backLeftMotorPin 10
+#define backRightMotorPin 4
+#define frontRightMotorPin 6
 
 
-#define rightStickHorizontalPin 2
-#define rightStickVerticalPin 1
-#define intakePin 4
-#define eStopPin 6
+#define rightStickHorizontalPin 9
+#define rightStickVerticalPin 8
+#define intakePin 10
+#define eStopPin 12
 
 #define NOISE_THRESHOLD 50
 #define CHANNEL_DEADZONE 50
-#define CHANNEL_DEADZONE_CENTER 1500
+#define CHANNEL_DEADZONE_CENTER 50
 
 #define FOUR_MOTORS false
 
@@ -37,6 +37,7 @@ struct ChannelInfo {
   bool wasOn;
   bool valueChanged;
   unsigned long lastHighTime;
+  unsigned long lastPulseWidth;
   float value;
   bool invert;
 };
@@ -57,33 +58,43 @@ volatile Channels channels = {
 };
 
 void updateChannel(volatile ChannelInfo& channel) {
-    const bool newState = digitalRead(channel.pin);
-    const bool oldState = channel.wasOn;
-    channel.valueChanged = false;
-    if (newState != oldState) {
-        const unsigned long now = micros();
-        if (newState) {
-            // store rising time
-            channel.lastHighTime = now;
-            channel.wasOn = true;
-        } else {
-            channel.wasOn = false;
-            // how long was the pulse?
-            long delta = now - channel.lastHighTime;
-            if (delta < NOISE_THRESHOLD) return;
-            // channel.delta = delta;
-            // apply deadzone
-            if (delta >= 2000 - CHANNEL_DEADZONE) delta = 2000;
-            if (delta <= 1000 + CHANNEL_DEADZONE) delta = 1000;
-            if (abs(delta - 1500) <= CHANNEL_DEADZONE_CENTER) delta = 1500;
-            // channel.deltaNormalized = delta;
-            // convert 1000 <= delta <= 2000 to -1.0 <= value <= 1.0
-            channel.value = (float)(delta - 1500) / 500.0f;
-            // apply per-channel inversion if requested
-            if (channel.invert) channel.value = -channel.value;
-            channel.valueChanged = true;
-        }
+  // Keep ISR as short as possible: only record timestamps and pulse width
+  const bool newState = digitalRead(channel.pin);
+  const bool oldState = channel.wasOn;
+  if (newState != oldState) {
+    const unsigned long now = micros();
+    if (newState) {
+      // store rising time
+      channel.lastHighTime = now;
+      channel.wasOn = true;
+    } else {
+      // falling edge: compute pulse width and mark for main loop
+      channel.wasOn = false;
+      unsigned long delta = now - channel.lastHighTime;
+      if (delta < NOISE_THRESHOLD) return;
+      channel.lastPulseWidth = delta;
+      channel.valueChanged = true;
     }
+  }
+}
+
+// Atomically copy pulse data and convert to normalized float value in main loop
+void processChannel(volatile ChannelInfo& channel) {
+  if (!channel.valueChanged) return;
+  // copy multi-byte data atomically
+  noInterrupts();
+  unsigned long pulse = channel.lastPulseWidth;
+  channel.valueChanged = false;
+  interrupts();
+
+  long delta = (long)pulse;
+  // apply deadzone and snapping
+  if (delta >= 2000 - CHANNEL_DEADZONE) delta = 2000;
+  if (delta <= 1000 + CHANNEL_DEADZONE) delta = 1000;
+  if (abs(delta - 1500) <= CHANNEL_DEADZONE_CENTER) delta = 1500;
+  // convert 1000 <= delta <= 2000 to -1.0 <= value <= 1.0
+  channel.value = (float)(delta - 1500) / 500.0f;
+  if (channel.invert) channel.value = -channel.value;
 }
 
 DriveValues driveTank(float go, float steer) {
@@ -101,6 +112,7 @@ void setup() {
   pinMode(rightStickHorizontalPin, INPUT);
   pinMode(rightStickVerticalPin, INPUT);
   pinMode(intakePin, INPUT);
+  pinMode(eStopPin, INPUT);
   attachInterrupt(digitalPinToInterrupt(rightStickHorizontalPin), []{updateChannel(channels.rightStickHorizontal); }, CHANGE);
   attachInterrupt(digitalPinToInterrupt(rightStickVerticalPin), []{updateChannel(channels.rightStickVertical); }, CHANGE);
   attachInterrupt(digitalPinToInterrupt(intakePin), []{updateChannel(channels.intake); }, CHANGE);
@@ -118,6 +130,12 @@ void setup() {
 }
 
 void loop() {
+  // First handle any newly-measured pulses from ISRs
+  processChannel(channels.rightStickHorizontal);
+  processChannel(channels.rightStickVertical);
+  processChannel(channels.intake);
+  processChannel(channels.eStop);
+
     if (channels.eStop.value > 0.5f) {
       // E-Stop engaged, stop all motors
       #if FOUR_MOTORS

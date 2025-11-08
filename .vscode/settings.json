@@ -1,0 +1,17 @@
+{
+  // Enable inline (ghost) suggestions
+  "editor.inlineSuggest.enabled": true,
+
+  // Disable the suggestion widget / autocomplete popups while typing
+  "editor.quickSuggestions": {
+    "other": false,
+    "comments": false,
+    "strings": false
+  },
+  "editor.suggestOnTriggerCharacters": false,
+  "editor.parameterHints.enabled": false,
+
+  // If you use GitHub Copilot and want its ghost text provider, enable inline suggestions
+  // (this key works when the Copilot extension is installed)
+  "github.copilot.inlineSuggest.enable": true
+}

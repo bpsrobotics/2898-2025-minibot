@@ -1,12 +1,14 @@
 #include <Arduino.h>
 #include <Wire.h>
-#include <servo-wrapper>
+#include "servo-wrapper.h"
 #include <math.h>
 
 #define frontLeftMotorPin 5
 #define backLeftMotorPin 6
-#define backRightMotorPin 5
+#define backRightMotorPin 9
 #define frontRightMotorPin 10
+
+#define switchAPin 7
 
 
 #define rightStickHorizontalPin 2
@@ -32,7 +34,9 @@
 
 struct DriveValues { float left, right; };
 
-struct channelInfo {
+struct vector2 { float x, y; };
+
+struct ChannelInfo {
   uint8_t pin;
   bool wasOn;
   bool valueChanged;
@@ -40,13 +44,21 @@ struct channelInfo {
   float value;
 };
 
-struct channels{
-  volatile channelInfo rightStickHorizontal {rightStickHorizontalPin, false, false, 0, 0.0f};
-  volatile channelInfo rightStickVertical {rightStickVerticalPin, false, false, 0, 0.0f};
-  volatile channelInfo intake {intakePin, false, false, 0, 0.0f};
+struct ChannelSet{
+  volatile ChannelInfo rightStickHorizontal;
+  volatile ChannelInfo rightStickVertical;
+  volatile ChannelInfo intake;
+  volatile ChannelInfo switchA;
 };
 
-void updateChannel(volatile channelInfo& channel){
+volatile ChannelSet channels = {
+  {rightStickHorizontalPin, false, false, 0, 0.0f},
+  {rightStickVerticalPin, false, false, 0, 0.0f},
+  {intakePin, false, false, 0, 0.0f},
+  {switchAPin, false, false, 0, 0.0f}
+};
+
+void updateChannel(volatile ChannelInfo& channel){
   const bool newState = digitalRead(channel.pin);
   const bool oldState = channel.wasOn;
   channel.valueChanged = false;
@@ -78,13 +90,14 @@ DriveValues driveTank(float go, float steer) {
 }
 
 void setup() {
-  Serial.(9600);
+  Serial.begin(9600);
   pinMode(rightStickHorizontalPin, INPUT);
   pinMode(rightStickVerticalPin, INPUT);
   pinMode(intakePin, INPUT);
   attachInterrupt(digitalPinToInterrupt(rightStickHorizontalPin), []{updateChannel(channels.rightStickHorizontal); }, CHANGE);
   attachInterrupt(digitalPinToInterrupt(rightStickVerticalPin), []{updateChannel(channels.rightStickVertical); }, CHANGE);
   attachInterrupt(digitalPinToInterrupt(intakePin), []{updateChannel(channels.intake); }, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(switchAPin), []{updateChannel(channels.switchA); }, CHANGE);
 
   #if FOUR_MOTORS
     frontLeft.begin();
@@ -112,13 +125,12 @@ void loop() {
         return;
     }
 
-    vec2 stick = vec2(
-        channels.rightStickHorizontal.value,
-        channels.rightStickVertical.value
-    );
+    vector2 stick;
+    stick.x = channels.rightStickHorizontal.value;
+    stick.y = channels.rightStickVertical.value;
     
     // Move motors
-    DriveValues driveValues = driveTank(stick.x, stick.y)
+    DriveValues driveValues = driveTank(stick.x, stick.y);
 
     #if FOUR_MOTORS
       frontLeft.drive(driveValues.left);
@@ -135,13 +147,5 @@ void loop() {
     // backLeft.drive(v);
     // backRight.drive(v);
     // Fans
-    
-    // Debugging assistance
-    Serial.println(
-        String("RH:") + channels.rightStickHorizontal.value
-            + ", RV:" + channels.rightStickVertical.value
-            + ", LH:" + channels.leftStickHorizontal.value
-            + ", LV:" + channels.leftStickVertical.value
-    );
 }
 

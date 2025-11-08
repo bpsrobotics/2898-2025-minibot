@@ -10,11 +10,14 @@
 
 #define eStopPin 11
 
+#define leftPowerAdjPin 12
+#define rightPowerAdjPin 13
 
 #define rightStickHorizontalPin 9
 #define rightStickVerticalPin 8
 #define intakePin 10
 
+#define MAX_COMPENSATION 1.0f
 
 #define NOISE_THRESHOLD 50
 #define CHANNEL_DEADZONE 50
@@ -49,6 +52,9 @@ struct ChannelSet{
   volatile ChannelInfo rightStickVertical;
   volatile ChannelInfo intake;
   volatile ChannelInfo switchA;
+  volatile ChannelInfo leftPowerAdj;
+  volatile ChannelInfo rightPowerAdj;
+  volatile ChannelInfo eStop;
 };
 
 volatile ChannelSet channels = {
@@ -98,6 +104,8 @@ void setup() {
   attachInterrupt(digitalPinToInterrupt(rightStickVerticalPin), []{updateChannel(channels.rightStickVertical); }, CHANGE);
   attachInterrupt(digitalPinToInterrupt(intakePin), []{updateChannel(channels.intake); }, CHANGE);
   attachInterrupt(digitalPinToInterrupt(eStopPin), []{updateChannel(channels.switchA); }, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(rightPowerAdjPin), []{updateChannel(channels.rightPowerAdj); }, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(leftPowerAdjPin), []{updateChannel(channels.leftPowerAdj); }, CHANGE);
 
   #if FOUR_MOTORS
     frontLeft.begin();
@@ -131,7 +139,26 @@ void loop() {
     
     // Move motors
     DriveValues driveValues = driveTank(stick.x, stick.y);
+    if (channels.eStop.value > 0.5f) {
+      driveValues.left = 0.0f;
+      driveValues.right = 0.0f;
+    }
 
+    float left = driveValues.left;
+    float right = driveValues.right;
+    float leftAdjNorm = (channels.leftPowerAdj.value + 1.0f) * 0.5f;
+    float rightAdjNorm = (channels.rightPowerAdj.value + 1.0f) * 0.5f;
+
+    if (leftAdjNorm > 0.01f){
+      float comp = leftAdjNorm * MAX_COMPENSATION;
+      right *= (1.0f - comp);
+    }
+
+    if (rightAdjNorm > 0.01f){
+      float comp = rightAdjNorm * MAX_COMPENSATION;
+      left *- (1.0f - comp);
+    }
+    
     #if FOUR_MOTORS
       frontLeft.drive(driveValues.left);
       backLeft.drive(driveValues.left);
@@ -141,11 +168,5 @@ void loop() {
       leftMotor.drive(driveValues.left);
       rightMotor.drive(driveValues.right);
     #endif
-    // float v = channels.rightStickVertical.value;
-    // frontLeft.drive(v);
-    // frontRight.drive(v);
-    // backLeft.drive(v);
-    // backRight.drive(v);
-    // Fans
 }
 

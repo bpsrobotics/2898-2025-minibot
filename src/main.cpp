@@ -3,17 +3,17 @@
 #include "servo-wrapper.h"
 #include <math.h>
 
-#define frontLeftMotorPin 5
-#define backLeftMotorPin 6
-#define backRightMotorPin 9
-#define frontRightMotorPin 10
+#define frontLeftMotorPin 6
+#define backLeftMotorPin 10
+#define backRightMotorPin 4
+#define frontRightMotorPin 5
 
-#define switchAPin 7
+#define eStopPin 11
 
 
-#define rightStickHorizontalPin 2
-#define rightStickVerticalPin 3
-#define intakePin 4
+#define rightStickHorizontalPin 9
+#define rightStickVerticalPin 8
+#define intakePin 10
 
 
 #define NOISE_THRESHOLD 50
@@ -55,7 +55,7 @@ volatile ChannelSet channels = {
   {rightStickHorizontalPin, false, false, 0, 0.0f},
   {rightStickVerticalPin, false, false, 0, 0.0f},
   {intakePin, false, false, 0, 0.0f},
-  {switchAPin, false, false, 0, 0.0f}
+  {eStopPin, false, false, 0, 0.0f}
 };
 
 void updateChannel(volatile ChannelInfo& channel){
@@ -97,7 +97,7 @@ void setup() {
   attachInterrupt(digitalPinToInterrupt(rightStickHorizontalPin), []{updateChannel(channels.rightStickHorizontal); }, CHANGE);
   attachInterrupt(digitalPinToInterrupt(rightStickVerticalPin), []{updateChannel(channels.rightStickVertical); }, CHANGE);
   attachInterrupt(digitalPinToInterrupt(intakePin), []{updateChannel(channels.intake); }, CHANGE);
-  attachInterrupt(digitalPinToInterrupt(switchAPin), []{updateChannel(channels.switchA); }, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(eStopPin), []{updateChannel(channels.switchA); }, CHANGE);
 
   #if FOUR_MOTORS
     frontLeft.begin();

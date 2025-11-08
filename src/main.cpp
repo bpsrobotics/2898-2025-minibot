@@ -21,8 +21,12 @@
 #define NOISE_THRESHOLD 50
 #define CHANNEL_DEADZONE 50
 #define CHANNEL_DEADZONE_CENTER 50
+#define INTAKE_MOVED_TRHESHOLD 0.0f
+
 
 #define FOUR_MOTORS false
+
+ServoWrapper intake(intakePin);
 
 #if FOUR_MOTORS
   ServoWrapper frontLeft(frontLeftMotorPin);
@@ -65,6 +69,8 @@ volatile Channels channels = {
   { rightPowerAdjPin, false, false, 0, 0.0f, false }
 };
 
+// has the intake moved from the inital position?
+volatile bool intakeMoved = false;
 
 void updateChannel(volatile ChannelInfo& channel) {
   // Keep ISR as short as possible: only record timestamps and pulse width
@@ -151,6 +157,8 @@ void loop() {
   processChannel(channels.leftPowerAdj);
   processChannel(channels.rightPowerAdj);
 
+  
+
   // Check for emergency stop
   if (channels.eStop.value > 0.5f) {
     // E-Stop engaged, stop all motors
@@ -165,6 +173,15 @@ void loop() {
     #endif
     return;
   }
+
+  //read intake values
+  float intakeSpeed = channels.intake.value;
+
+  // if the intake has moved above the threshold, enable intake movement.
+  if(intakeMoved == false){
+    if(intakeMoved >= INTAKE_MOVED_TRHESHOLD) intakeMoved = true;
+  }
+
 
   // read stick values (vertical = forward/back, horizontal = steer)
   float go = channels.rightStickVertical.value;
@@ -191,6 +208,11 @@ void loop() {
   }
   
   // Apply final drive values to motors
+
+  if(intakeMoved == true){
+    intake.drive(intakeSpeed);
+  }
+  
   #if FOUR_MOTORS
     frontLeft.drive(left);
     backLeft.drive(left);

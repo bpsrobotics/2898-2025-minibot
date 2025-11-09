@@ -3,16 +3,20 @@
 #include <math.h>
 #include "servo-wrapper.h"
 
-#define frontLeftMotorPin 5
-#define backLeftMotorPin 10
-#define backRightMotorPin 4
-#define frontRightMotorPin 6
-
+#define frontLeftMotorPin 6
+#define backLeftMotorPin 10 // Not used if using two motors
+#define backRightMotorPin 4 // Not used if using two motors
+#define frontRightMotorPin 5
 
 #define rightStickHorizontalPin 9
 #define rightStickVerticalPin 8
 #define intakePin 10
-#define eStopPin 12
+#define eStopPin 11
+
+#define leftPowerAdjPin 12
+#define rightPowerAdjPin 13
+
+#define MAX_COMPENSATION 1.0f // maximum fraction to reduce the opposite motor (0.0 - 1.0)
 
 #define NOISE_THRESHOLD 50
 #define CHANNEL_DEADZONE 50
@@ -47,6 +51,8 @@ struct Channels {
   volatile ChannelInfo rightStickVertical;
   volatile ChannelInfo intake;
   volatile ChannelInfo eStop;
+  volatile ChannelInfo leftPowerAdj;
+  volatile ChannelInfo rightPowerAdj;
 };
 
 // instantiate global channels with initial values
@@ -54,8 +60,11 @@ volatile Channels channels = {
   { rightStickHorizontalPin, false, false, 0, 0.0f, false },
   { rightStickVerticalPin, false, false, 0, 0.0f, false },
   { intakePin, false, false, 0, 0.0f, false },
-  { eStopPin, false, false, 0, 0.0f, false }
+  { eStopPin, false, false, 0, 0.0f, false },
+  { leftPowerAdjPin, false, false, 0, 0.0f, false },
+  { rightPowerAdjPin, false, false, 0, 0.0f, false }
 };
+
 
 void updateChannel(volatile ChannelInfo& channel) {
   // Keep ISR as short as possible: only record timestamps and pulse width
@@ -113,10 +122,14 @@ void setup() {
   pinMode(rightStickVerticalPin, INPUT);
   pinMode(intakePin, INPUT);
   pinMode(eStopPin, INPUT);
+  pinMode(leftPowerAdjPin, INPUT);
+  pinMode(rightPowerAdjPin, INPUT);
   attachInterrupt(digitalPinToInterrupt(rightStickHorizontalPin), []{updateChannel(channels.rightStickHorizontal); }, CHANGE);
   attachInterrupt(digitalPinToInterrupt(rightStickVerticalPin), []{updateChannel(channels.rightStickVertical); }, CHANGE);
   attachInterrupt(digitalPinToInterrupt(intakePin), []{updateChannel(channels.intake); }, CHANGE);
   attachInterrupt(digitalPinToInterrupt(eStopPin), []{updateChannel(channels.eStop); }, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(leftPowerAdjPin), []{updateChannel(channels.leftPowerAdj); }, CHANGE);
+  attachInterrupt(digitalPinToInterrupt(rightPowerAdjPin), []{updateChannel(channels.rightPowerAdj); }, CHANGE);
 
   #if FOUR_MOTORS
     frontLeft.begin();
@@ -135,35 +148,56 @@ void loop() {
   processChannel(channels.rightStickVertical);
   processChannel(channels.intake);
   processChannel(channels.eStop);
+  processChannel(channels.leftPowerAdj);
+  processChannel(channels.rightPowerAdj);
 
-    if (channels.eStop.value > 0.5f) {
-      // E-Stop engaged, stop all motors
-      #if FOUR_MOTORS
-        frontLeft.drive(0.0f);
-        backLeft.drive(0.0f);
-        frontRight.drive(0.0f);
-        backRight.drive(0.0f);
-      #else
-        leftMotor.drive(0.0f);
-        rightMotor.drive(0.0f);
-      #endif
-      return;
-    }
-
-    // read stick values (vertical = forward/back, horizontal = steer)
-    float go = channels.rightStickVertical.value;
-    float steer = channels.rightStickHorizontal.value;
-
-    // Move motors
-    DriveValues driveValues = driveTank(go, steer);
-
+  // Check for emergency stop
+  if (channels.eStop.value > 0.5f) {
+    // E-Stop engaged, stop all motors
     #if FOUR_MOTORS
-      frontLeft.drive(driveValues.left);
-      backLeft.drive(driveValues.left);
-      frontRight.drive(driveValues.right);
-      backRight.drive(driveValues.right);
+      frontLeft.drive(0.0f);
+      backLeft.drive(0.0f);
+      frontRight.drive(0.0f);
+      backRight.drive(0.0f);
     #else
-      leftMotor.drive(driveValues.left);
-      rightMotor.drive(driveValues.right);
+      leftMotor.drive(0.0f);
+      rightMotor.drive(0.0f);
     #endif
+    return;
+  }
+
+  // read stick values (vertical = forward/back, horizontal = steer)
+  float go = channels.rightStickVertical.value;
+  float steer = channels.rightStickHorizontal.value;
+
+  // Move motors
+  DriveValues driveValues = driveTank(go, steer);
+  
+  // Apply left/right compensation based on adjustment channels.
+  float left = driveValues.left;
+  float right = driveValues.right;
+  float leftAdjNorm = (channels.leftPowerAdj.value + 1.0f) * 0.5f;
+  float rightAdjNorm = (channels.rightPowerAdj.value + 1.0f) * 0.5f;
+  
+  // If left adjustment requested, make left relatively stronger by reducing right.
+  if (leftAdjNorm > 0.01f) {
+    float comp = leftAdjNorm * MAX_COMPENSATION; // 0..MAX_COMPENSATION
+    right *= (1.0f - comp);
+  }
+  // If right adjustment requested, make right relatively stronger by reducing left.
+  if (rightAdjNorm > 0.01f) {
+    float comp = rightAdjNorm * MAX_COMPENSATION;
+    left *= (1.0f - comp);
+  }
+  
+  // Apply final drive values to motors
+  #if FOUR_MOTORS
+    frontLeft.drive(left);
+    backLeft.drive(left);
+    frontRight.drive(right);
+    backRight.drive(right);
+  #else
+    leftMotor.drive(left);
+    rightMotor.drive(right);
+  #endif
 }

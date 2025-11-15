@@ -179,7 +179,7 @@ void loop() {
 
   // if the intake has moved above the threshold, enable intake movement.
   if(intakeMoved == false){
-    if(intakeMoved >= INTAKE_MOVED_TRHESHOLD) intakeMoved = true;
+    if(intakeSpeed >= INTAKE_MOVED_TRHESHOLD) intakeMoved = true;
   }
 
 

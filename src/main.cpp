@@ -7,6 +7,7 @@
 #define backLeftMotorPin 10 // Not used if using two motors
 #define backRightMotorPin 4 // Not used if using two motors
 #define frontRightMotorPin 5
+#define intakeMotorPin 3
 
 #define rightStickHorizontalPin 9
 #define rightStickVerticalPin 8
@@ -21,12 +22,12 @@
 #define NOISE_THRESHOLD 50
 #define CHANNEL_DEADZONE 50
 #define CHANNEL_DEADZONE_CENTER 50
-#define INTAKE_MOVED_TRHESHOLD 0.0f
+#define INTAKE_MOVED_TRHESHOLD 0.1f
 
 
 #define FOUR_MOTORS false
 
-ServoWrapper intake(intakePin);
+ServoWrapper intakeMotor(intakeMotorPin);
 
 #if FOUR_MOTORS
   ServoWrapper frontLeft(frontLeftMotorPin);
@@ -146,6 +147,8 @@ void setup() {
     leftMotor.begin();
     rightMotor.begin();
   #endif
+
+  intakeMotor.begin();
 }
 
 void loop() {
@@ -156,8 +159,6 @@ void loop() {
   processChannel(channels.eStop);
   processChannel(channels.leftPowerAdj);
   processChannel(channels.rightPowerAdj);
-
-  
 
   // Check for emergency stop
   if (channels.eStop.value > 0.5f) {
@@ -171,6 +172,7 @@ void loop() {
       leftMotor.drive(0.0f);
       rightMotor.drive(0.0f);
     #endif
+    intakeMotor.drive(0.0f);
     return;
   }
 
@@ -178,10 +180,9 @@ void loop() {
   float intakeSpeed = channels.intake.value;
 
   // if the intake has moved above the threshold, enable intake movement.
-  if(intakeMoved == false){
+  if(intakeMoved == false) {
     if(intakeSpeed >= INTAKE_MOVED_TRHESHOLD) intakeMoved = true;
   }
-
 
   // read stick values (vertical = forward/back, horizontal = steer)
   float go = channels.rightStickVertical.value;
@@ -208,9 +209,8 @@ void loop() {
   }
   
   // Apply final drive values to motors
-
   if(intakeMoved == true){
-    intake.drive(intakeSpeed);
+    intakeMotor.drive(intakeSpeed);
   }
   
   #if FOUR_MOTORS

@@ -7,6 +7,7 @@
 #define backLeftMotorPin 10 // Not used if using two motors
 #define backRightMotorPin 4 // Not used if using two motors
 #define frontRightMotorPin 5
+#define intakeMotorPin 3
 
 #define rightStickHorizontalPin 9
 #define rightStickVerticalPin 8
@@ -18,15 +19,17 @@
 
 #define MAX_COMPENSATION 1.0f // maximum fraction to reduce the opposite motor (0.0 - 1.0)
 
-#define NOISE_THRESHOLD 50
+#define NOISE_THRESHOLD 100
 #define CHANNEL_DEADZONE 50
 #define CHANNEL_DEADZONE_CENTER 50
-#define INTAKE_MOVED_TRHESHOLD 0.0f
+#define INTAKE_MOVED_THRESHOLD 0.5f
 
 
 #define FOUR_MOTORS false
 
-ServoWrapper intake(intakePin);
+ServoWrapper intake(intakeMotorPin);
+
+unsigned long lastMillis = 0;
 
 #if FOUR_MOTORS
   ServoWrapper frontLeft(frontLeftMotorPin);
@@ -64,7 +67,7 @@ volatile Channels channels = {
   { rightStickHorizontalPin, false, false, 0, 0.0f, false },
   { rightStickVerticalPin, false, false, 0, 0.0f, false },
   { intakePin, false, false, 0, 0.0f, false },
-  { eStopPin, false, false, 0, 0.0f, false },
+  { eStopPin, false, false, 0, -1.0f, false },
   { leftPowerAdjPin, false, false, 0, 0.0f, false },
   { rightPowerAdjPin, false, false, 0, 0.0f, false }
 };
@@ -146,6 +149,8 @@ void setup() {
     leftMotor.begin();
     rightMotor.begin();
   #endif
+
+  intake.begin();
 }
 
 void loop() {
@@ -174,14 +179,11 @@ void loop() {
     return;
   }
 
-  //read intake values
+  // read intake values
   float intakeSpeed = channels.intake.value;
-
-  // if the intake has moved above the threshold, enable intake movement.
-  if(intakeMoved == false){
-    if(intakeMoved >= INTAKE_MOVED_TRHESHOLD) intakeMoved = true;
+  if(intakeSpeed >= INTAKE_MOVED_THRESHOLD){
+    if(intakeMoved != true) intakeMoved = true;
   }
-
 
   // read stick values (vertical = forward/back, horizontal = steer)
   float go = channels.rightStickVertical.value;
@@ -208,10 +210,7 @@ void loop() {
   }
   
   // Apply final drive values to motors
-
-  if(intakeMoved == true){
-    intake.drive(intakeSpeed);
-  }
+   intake.drive((intakeMoved == true && (intakeSpeed >= 0.5 || intakeSpeed <= -0.5))? intakeSpeed : 0.0f);
   
   #if FOUR_MOTORS
     frontLeft.drive(left);

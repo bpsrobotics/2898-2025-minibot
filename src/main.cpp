@@ -9,8 +9,8 @@
 #define frontRightMotorPin 5
 #define intakeMotorPin 3
 
-#define rightStickHorizontalPin 9
-#define rightStickVerticalPin 8
+#define rightStickHorizontalPin 8
+#define rightStickVerticalPin 9
 #define intakePin 10
 #define eStopPin 11
 
@@ -37,7 +37,7 @@ unsigned long lastMillis = 0;
   ServoWrapper backLeft(backLeftMotorPin);
   ServoWrapper backRight(backRightMotorPin);
 #else
-  ServoWrapper leftMotor(frontLeftMotorPin);
+  ServoWrapper leftMotor(frontLeftMotorPin, -1.0f);
   ServoWrapper rightMotor(frontRightMotorPin);
 #endif
 
@@ -162,8 +162,6 @@ void loop() {
   processChannel(channels.leftPowerAdj);
   processChannel(channels.rightPowerAdj);
 
-  
-
   // Check for emergency stop
   if (channels.eStop.value > 0.5f) {
     // E-Stop engaged, stop all motors
@@ -176,6 +174,7 @@ void loop() {
       leftMotor.drive(0.0f);
       rightMotor.drive(0.0f);
     #endif
+    intakeMotor.drive(0.0f);
     return;
   }
 

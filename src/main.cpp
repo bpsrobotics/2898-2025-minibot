@@ -27,7 +27,7 @@
 
 #define FOUR_MOTORS false
 
-ServoWrapper intake(intakeMotorPin);
+ServoWrapper intakeMotor(intakeMotorPin);
 
 unsigned long lastMillis = 0;
 
@@ -150,7 +150,7 @@ void setup() {
     rightMotor.begin();
   #endif
 
-  intake.begin();
+  intakeMotor.begin();
 }
 
 void loop() {
@@ -209,7 +209,7 @@ void loop() {
   }
   
   // Apply final drive values to motors
-   intake.drive((intakeMoved == true && (intakeSpeed >= 0.5 || intakeSpeed <= -0.5))? intakeSpeed : 0.0f);
+   intakeMotor.drive((intakeMoved == true && (intakeSpeed >= 0.5 || intakeSpeed <= -0.5))? intakeSpeed : 0.0f);
   
   #if FOUR_MOTORS
     frontLeft.drive(left);

@@ -27,7 +27,7 @@
 
 #define FOUR_MOTORS false
 
-ServoWrapper intakeMotor(intakeMotorPin);
+ServoWrapper intakeMotor(intakeMotorPin, -1.0f);
 
 unsigned long lastMillis = 0;
 

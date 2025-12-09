@@ -9,8 +9,8 @@ FRC 2898's minibot robot code for the 2025 Bunnybots season
 |---------|------------------------------------------|------|------------------------|
 | 1       | Right stick left/right, left is negative | 8    |  move left/right       |
 | 2       | Right stick up/down, down is negative    | 9    |  move forward/backward |
-| 3       | Left stick up/down, down is negative     | none |                        |
-| 4       | Left stick left/right, left is negative  | 10   |  intake forward/reverse|
+| 3       | Left stick up/down, down is negative     | 10   |  intake forward/reverse|
+| 4       | Left stick left/right, left is negative  | none |                        |
 | 5       | Switch A, up is negative                 | 11   |  down to e-stop        |
 | 6       | Switch D, up is negative                 | none |                        |
 | 7       | Switch B, up is negative                 | none |                        |

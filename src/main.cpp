@@ -79,6 +79,7 @@ void updateChannel(volatile ChannelInfo& channel) {
   // Keep ISR as short as possible: only record timestamps and pulse width
   const bool newState = digitalRead(channel.pin);
   const bool oldState = channel.wasOn;
+  channel.valueChanged = false;
   if (newState != oldState) {
     const unsigned long now = micros();
     if (newState) {
@@ -94,25 +95,23 @@ void updateChannel(volatile ChannelInfo& channel) {
       channel.valueChanged = true;
     }
   }
-}
 
-// Atomically copy pulse data and convert to normalized float value in main loop
-void processChannel(volatile ChannelInfo& channel) {
-  if (!channel.valueChanged) return;
-  // copy multi-byte data atomically
-  noInterrupts();
-  unsigned long pulse = channel.lastPulseWidth;
-  channel.valueChanged = false;
-  interrupts();
+  // Atomically copy pulse data and convert to normalized float value in main loop
+  if (channel.valueChanged) {
+    noInterrupts();
+    unsigned long pulse = channel.lastPulseWidth;
+    channel.valueChanged = false;
+    interrupts();
 
-  long delta = (long)pulse;
-  // apply deadzone and snapping
-  if (delta >= 2000 - CHANNEL_DEADZONE) delta = 2000;
-  if (delta <= 1000 + CHANNEL_DEADZONE) delta = 1000;
-  if (abs(delta - 1500) <= CHANNEL_DEADZONE_CENTER) delta = 1500;
-  // convert 1000 <= delta <= 2000 to -1.0 <= value <= 1.0
-  channel.value = (float)(delta - 1500) / 500.0f;
-  if (channel.invert) channel.value = -channel.value;
+    long delta = (long)pulse;
+    // apply deadzone and snapping
+    if (delta >= 2000 - CHANNEL_DEADZONE) delta = 2000;
+    if (delta <= 1000 + CHANNEL_DEADZONE) delta = 1000;
+    if (abs(delta - 1500) <= CHANNEL_DEADZONE_CENTER) delta = 1500;
+    // convert 1000 <= delta <= 2000 to -1.0 <= value <= 1.0
+    channel.value = (float)(delta - 1500) / 500.0f;
+    if (channel.invert) channel.value = -channel.value;
+  }
 }
 
 DriveValues driveTank(float go, float steer) {
@@ -154,14 +153,6 @@ void setup() {
 }
 
 void loop() {
-  // First handle any newly-measured pulses from ISRs
-  processChannel(channels.rightStickHorizontal);
-  processChannel(channels.rightStickVertical);
-  processChannel(channels.intake);
-  processChannel(channels.eStop);
-  processChannel(channels.leftPowerAdj);
-  processChannel(channels.rightPowerAdj);
-
   // Check for emergency stop
   if (channels.eStop.value > 0.5f) {
     // E-Stop engaged, stop all motors

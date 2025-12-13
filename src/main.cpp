@@ -29,8 +29,6 @@
 
 ServoWrapper intakeMotor(intakeMotorPin, 1.0f);
 
-unsigned long lastMillis = 0;
-
 #if FOUR_MOTORS
   ServoWrapper frontLeft(frontLeftMotorPin);
   ServoWrapper frontRight(frontRightMotorPin);
